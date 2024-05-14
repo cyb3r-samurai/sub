@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/hello.dir/main.cpp.o CMakeFiles/hello.dir/test.cpp.o CMakeFiles/hello.dir/RwLock.cpp.o -o hello  -lpthread -lrt
