@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/gcr.dir/test.cpp.o CMakeFiles/gcr.dir/RwLock.cpp.o CMakeFiles/gcr.dir/main.cpp.o -o gcr  -lpthread -lrt
