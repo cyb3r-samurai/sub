@@ -1,61 +1,84 @@
+#include "CircularQueue.h"
+#include "Message.h"
 #include "os.h"
 #include "test.h"
 #include"RwLock.h"
 #include "config.h"
+#include "Subsciber.h"
+#include <chrono>
 #include <cstdint>
-
 #include <iostream>
-#define STORAGE_ID "/SHM_TEST"
+#include <cmath>
+
+class Stat {
+ public:
+  Stat() { clear(); }
+
+  void clear() {
+    n = 0;
+    lost = 0;
+  }
+
+  void add(double value) {
+    n++;
+  }
+  void count_check(uint32_t count)
+  {
+    size_t dif = count - last_count;
+    if ((dif>1)&& (dif<1000) )
+      lost += dif; 
+    last_count = count;
+  }
+  size_t size() const { return n; }
+  size_t loss() const { return lost;}
+  friend std::ostream& operator<<(std::ostream& o, const Stat& s);
+
+ private:
+  size_t n{};
+  size_t lost{};
+  uint32_t last_count{};
+};
+
+std::ostream& operator<<(std::ostream& o, const Stat& s) {
+  return o <<" msg per second: "<< " (" << s.size() << ")"
+    << "lost msg count: "<< s.loss();}
+
+using namespace SUB2;
+
+#define TIMESCALE std::chrono::seconds
+#define TIMESCALE_COUNT 1e6
+#define TIMESCALE_NAME "us"
+
+uint64_t current_time() {
+  auto time_since_epoch = std::chrono::system_clock::now().time_since_epoch();
+  auto casted_time = std::chrono::duration_cast<TIMESCALE>(time_since_epoch);
+  return casted_time.count();
+}
+Stat per_sec_lag;
+
+void callback(Elem *el)
+{
+  Message *msg = reinterpret_cast<Message*>(el->msg);
+//  std::cout << msg->count << ' ';
+  auto lag = current_time()- msg->TimeStep;
+  per_sec_lag.add(lag);
+  per_sec_lag.count_check(msg->count);
+}
+
+
 int main()
 {
-    SUB2::RwLock r ;
-    SUB2::test t ;
-    
-    int res;
-  int shm;
-  SUB2::test* test_;
-  auto test_size = sizeof(SUB2::test);
-  auto lock_size = sizeof(SUB2::RwLock);
-
-  pid_t pid;
-  pid = getpid();
-     shm  = shm_open(STORAGE_ID, O_CREAT | O_RDWR, SHM_MODE);
-  if (shm == -1)
-    perror("shm_open");
-  auto *ptr = mmap(nullptr, sizeof(SUB2::test) , PROT_READ | PROT_WRITE,
-                   MAP_SHARED, shm, 0);	
-
-
-  auto *base_address= reinterpret_cast<uintptr_t*>(ptr);
-  auto *test_address = base_address;
-  auto *int_address = base_address + lock_size;
-
-    
-test_ = reinterpret_cast<SUB2::test*>(test_address);
-
-  
-  uint8_t recieved = 0;
-  
-   double time_counter = 0;
-
-  clock_t this_time = clock();
-  clock_t last_time = this_time;
-
-   while(true)
-    { 
-        this_time = clock();
-
-        time_counter += (double)(this_time - last_time);
-
-        last_time = this_time;
-
-        if(time_counter > (double)(3 * CLOCKS_PER_SEC))
-        {
-            time_counter -= (double)(3 * CLOCKS_PER_SEC);
-            test_->read(int_address, &recieved, sizeof(recieved));
-            std::cout << "PID: " << pid<< " get: " << +recieved <<std::endl;
-        }
+  Subscriber sub("proba", callback);
+  sub.open_memory_segment();
+  int seconds = 10;
+  for (int sec = 0; sec < seconds; ++sec) {
+    auto start = std::chrono::steady_clock::now();
+    for (auto now = start; now < start + std::chrono::seconds(1);
+         now = std::chrono::steady_clock::now()) {
+      sub.spin_once();
     }
-
+    std::cout << per_sec_lag << std::endl;
+    per_sec_lag.clear();
+  }
 
 }

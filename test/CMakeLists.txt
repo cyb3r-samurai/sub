@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD 17)
 add_executable(main 
     main.cpp
     RwLock.cpp
-    test.cpp
+    CircularQueue.cpp
+    Message.cpp 
+    Subscriber.cpp
 )
 target_link_libraries(main pthread rt)
